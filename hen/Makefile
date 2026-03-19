@@ -17,6 +17,7 @@ OBJS        := $(patsubst $(SDIR)/%.cpp, $(ODIR)/%.o, $(CXXFILES)) $(patsubst $(
 $(ELF): $(ODIR) $(OBJS)
 	$(CXX) $(ODIR)/*.o -o $(ELF) $(CFLAGS) $(LFLAGS)
 	objcopy -O binary $(ELF) $(BIN)
+	strip $@
 
 $(ODIR)/%.o: $(SDIR)/%.cpp
 	$(CXX) -c -o $@ $< $(CFLAGS)

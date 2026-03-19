@@ -21,6 +21,7 @@ $(HEN_BIN):
 
 $(ELF): $(SRCS) $(HEN_BIN)
 	$(CXX) $(CFLAGS) -o $@ $(SRCS)
+	strip $@
 
 clean:
 	$(MAKE) -C hen clean
