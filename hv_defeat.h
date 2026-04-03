@@ -46,6 +46,8 @@ struct vmcb_control_patch {
 static_assert(sizeof(vmcb_control_patch) == VMCB_PATCH_SIZE);
 
 #define MAX_VMCBS           16
+#define PAGE_SIZE           4096
+#define INKERNEL(va)        (va & 0xFFFF000000000000)
 
 // context
 struct hv_defeat_ctx {
@@ -78,3 +80,4 @@ int stage6_install_kexec(hv_defeat_ctx *ctx);
 int stage7_run_hen(hv_defeat_ctx *ctx);
 int kexec(uint64_t fptr);
 int run_hv_defeat(void); //uint64_t mp4_softc, uint64_t zcn_bar2);
+int kernel_pmap_invalidate_all(void);
