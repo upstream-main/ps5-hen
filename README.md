@@ -21,6 +21,7 @@ Supports firmwares:
 - Start elfldr by running UMTX or Y2JB
 - Close application 
 - Send the HEN payload and wait until the notification popup occurs
+    - **Currently only possible with `socat -t 99999999 - TCP:PS5.IP:9021 < ps5-hen.elf`** (will be fixed soon)
 - Have fun
 
 ## Changelog
@@ -30,7 +31,9 @@ Supports firmwares:
     - Only 03.10 firmware untested
 
 ## Known Issues
-- 1.xx and 2.xx firmwares have crashes after launching multiple ps4 fpkgs (needs to be investigated)
+- All firmwares have crashes after launching multiple ps4 fpkgs (needs to be investigated)
+- Currently can only be send with command above (need to make some changes to allow other sending methods)
+- Currently does not support Restmode
 - Speed can be improved for ps4 fpkg loading (already commented out logging)
 
 ## Credits
