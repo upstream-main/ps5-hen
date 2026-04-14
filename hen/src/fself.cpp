@@ -77,40 +77,39 @@ bool isFakeSelf(SelfContext* ctx) {
 }
 
 int sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook(SelfContext* ctx, SelfAuthInfo* parentAuth, int pathid, SelfAuthInfo* selfAuth) {
-    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto _sceSblAuthMgrCheckSelfIsLoadable = (int (*)(SelfContext *ctx, SelfAuthInfo *parentAuthInfo, int pathId, SelfAuthInfo *selfAuthInfo)) kdlsym(KERNEL_SYM_SCESBLAUTHMGRISLOADABLE2);
 
-    printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: 0x%016lX 0x%016lX 0x%016lX 0x%016lX\n", ctx, parentAuth, pathid, selfAuth);
+    // printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: 0x%016lX 0x%016lX 0x%016lX 0x%016lX\n", ctx, parentAuth, pathid, selfAuth);
     if(enableHook1 && ctx && parentAuth && selfAuth && isFakeSelf(ctx)) {
         uint32_t type;
 
         if(ctx->format == SelfFormat::ELF) {
             auto hdr = ctx->elfHeader;
             type = hdr->e_type;
-            printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is Fake ELF %i\n", type);
+            // printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is Fake ELF %i\n", type);
         }
         else {
             auto info = reinterpret_cast<SelfFakeAuthInfo*>(reinterpret_cast<uint8_t*>(ctx->selfHeader) + ctx->selfHeader->header_size + ctx->selfHeader->metadata_size - 0x100);
             if(info->size == sizeof(SelfAuthInfo)) {
-                printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is Fake SELF with own auth info\n");
+                // printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is Fake SELF with own auth info\n");
                 memcpy(selfAuth, &info->info, sizeof(SelfAuthInfo));
                 return 0;
             }
             auto hdr = reinterpret_cast<ElfHeader*>(ctx->selfHeader + (ctx->selfHeader->entry_num + 1));
             type = hdr->e_type;
-            printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is Fake SELF %i\n", type);
+            // printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is Fake SELF %i\n", type);
         }
 
         switch (type) {
             case ET_EXEC:
             case ET_SCE_EXEC:
             case ET_SCE_DYNEXEC: {
-                printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is EXEC AUTH\n");
+                // printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is EXEC AUTH\n");
                 memcpy(selfAuth, orbisExecAuthInfo, sizeof(SelfAuthInfo));
                 break;
             }
             case ET_SCE_DYNAMIC: {
-                printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is PRX AUTH\n");
+                // printf("sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook: is PRX AUTH\n");
                 memcpy(selfAuth, orbisPrxAuthInfo, sizeof(SelfAuthInfo));
                 break;
             }
@@ -121,41 +120,40 @@ int sceSblAuthMgrIsLoadable__sceSblAuthMgrCheckSelfIsLoadable_hook(SelfContext* 
 }
 //condtionally check them
 int _sceSblAuthMgrVerifySelfHeader_hook(SelfContext* ctx) {
-    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto M_TEMP = (void *) kdlsym(KERNEL_SYM_M_TEMP);
     auto malloc = (void*(*)(unsigned long size, void* type, int flags)) kdlsym(KERNEL_SYM_MALLOC);
     auto free   = (void(*)(void* addr, void* type)) kdlsym(KERNEL_SYM_FREE);
     auto mini_syscore = (SelfHeader *) kdlsym(KERNEL_SYM_MINI_SYSCORE_BIN);
     auto _sceSblAuthMgrVerifySelfHeader = (int(*)(SelfContext *context)) kdlsym(KERNEL_SYM_SCESBLAUTHMGRVERIFYHEADER);
 
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: 0x%016lX\n", ctx);
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: 0x%016lX\n", ctx);
     if(!ctx) {
         return -1;
     }
     if(!enableHook2 || !isFakeSelf(ctx)) {
         return _sceSblAuthMgrVerifySelfHeader(ctx);
     }
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: fake self\n");
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: fake self\n");
 
     auto backup = malloc(0x1000, M_TEMP, 0x102);
     auto ogSize = ctx->headerSize;
     auto ogFormat = ctx->format;
     auto newSize = mini_syscore->header_size + mini_syscore->metadata_size;
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: memcpy: %lx\n", ogSize);
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: memcpy: %lx\n", ogSize);
     memcpy(backup, ctx->selfHeader, ogSize);
 
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: memcpy2: %lx\n", newSize);
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: memcpy2: %lx\n", newSize);
     memcpy(ctx->selfHeader, mini_syscore, newSize);
     ctx->headerSize = newSize;
     ctx->format = SelfFormat::SELF;
 
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: before _sceSblAuthMgrVerifySelfHeader\n");
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: before _sceSblAuthMgrVerifySelfHeader\n");
     auto res = _sceSblAuthMgrVerifySelfHeader(ctx);
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: _sceSblAuthMgrVerifySelfHeader %i\n", res);
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: _sceSblAuthMgrVerifySelfHeader %i\n", res);
 
     ctx->format = ogFormat;
     ctx->headerSize = ogSize;
-    printf("_sceSblAuthMgrVerifySelfHeader_hook: memcpy3: %lx\n", ogSize);
+    // printf("_sceSblAuthMgrVerifySelfHeader_hook: memcpy3: %lx\n", ogSize);
     memcpy(ctx->selfHeader, backup, ogSize);
     free(backup, M_TEMP);
 
@@ -163,15 +161,14 @@ int _sceSblAuthMgrVerifySelfHeader_hook(SelfContext* ctx) {
 }
 
 int _sceSblAuthMgrSmLoadSelfSegment_sceSblServiceMailbox(uint64_t handle, MailboxLoadSelfSegmentMessage* input, MailboxLoadSelfSegmentMessage* output) {
-    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblServiceMailbox = (int (*)(uint64_t handle, void *input, void *output)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
 
-    printf("_sceSblAuthMgrSmLoadSelfSegment_sceSblServiceMailbox: 0x%016lX 0x%016lX 0x%016lX\n", handle, input, output);
+    // printf("_sceSblAuthMgrSmLoadSelfSegment_sceSblServiceMailbox: 0x%016lX 0x%016lX 0x%016lX\n", handle, input, output);
     //hexdump(input, 0x80, NULL, 0x0);
     if(enableHook3 && input && output) {
         auto ctx = getSelfContextByServiceId(input->serviceId);
         if(ctx && isFakeSelf(ctx)) {
-            printf("_sceSblAuthMgrSmLoadSelfSegment_sceSblServiceMailbox: fake self ctx: %016lX\n", ctx);
+            // printf("_sceSblAuthMgrSmLoadSelfSegment_sceSblServiceMailbox: fake self ctx: %016lX\n", ctx);
             output->res = 0;
             return 0;
         }
@@ -180,19 +177,18 @@ int _sceSblAuthMgrSmLoadSelfSegment_sceSblServiceMailbox(uint64_t handle, Mailbo
 }
 
 int _sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox(uint64_t handle, MailboxLoadSelfBlockMessage* input, MailboxLoadSelfBlockMessage* output) {
-    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblServiceMailbox = (int (*)(uint64_t handle, void *input, void *output)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
 
-    printf("_sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox: ctx: %016lX input: %016lX output: %016lX\n", handle, input, output);
+    // printf("_sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox: ctx: %016lX input: %016lX output: %016lX\n", handle, input, output);
     //hexdump(input, 0x80, NULL, 0x0);
     if(enableHook4 && input && output) {
         auto ctx = getSelfContextByServiceId(input->serviceId);
         if(ctx && isFakeSelf(ctx)) {
-            printf("_sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox: fake self ctx: %016lX\n", ctx);
+            // printf("_sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox: fake self ctx: %016lX\n", ctx);
             auto destBlock = get_dmap_addr(input->unk08);
             auto srcBlock =  get_dmap_addr(input->unk10);
             auto lenBlock =  input->unk30;
-            printf("_sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox: d %016lX s %016lX l %016lX\n", destBlock, srcBlock, lenBlock);
+            // printf("_sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox: d %016lX s %016lX l %016lX\n", destBlock, srcBlock, lenBlock);
             memcpy((void *) destBlock, (const void *) srcBlock, lenBlock);
             output->res = 0;
             return 0;
@@ -202,15 +198,14 @@ int _sceSblAuthMgrSmLoadSelfBlock_sceSblServiceMailbox(uint64_t handle, MailboxL
 }
 
 int _sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox(uint64_t handle, MailboxLoadMultipleSelfBlocksMessage* input, MailboxLoadMultipleSelfBlocksMessage* output) {
-    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblServiceMailbox = (int (*)(uint64_t handle, void *input, void *output)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
 
-    printf("_sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox: 0x%016lX 0x%016lX 0x%016lX\n", handle, input, output);
+    // printf("_sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox: 0x%016lX 0x%016lX 0x%016lX\n", handle, input, output);
     //hexdump(input, 0x80, NULL, 0x0);
     if(enableHook5 && input && output) {
         auto ctx = getSelfContextByServiceId(input->serviceId);
         if(ctx && isFakeSelf(ctx)) {
-            printf("_sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox: fake self ctx: %016lX\n", ctx);
+            // printf("_sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox: fake self ctx: %016lX\n", ctx);
             auto inputPa = (uint64_t*)get_dmap_addr(input->unk08);
             auto outputPa = (uint64_t*)get_dmap_addr(input->unk10);
 
@@ -220,7 +215,7 @@ int _sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox(uint64_t handle,
                 if(!sPa || !dPa) {continue;}
                 auto src = get_dmap_addr(sPa);
                 auto dst = get_dmap_addr(dPa);
-                printf("_sceSblAuthMgrSmLoadMultipleSelfBlocks %016X -> %016X\n", src, dst);
+                // printf("_sceSblAuthMgrSmLoadMultipleSelfBlocks %016X -> %016X\n", src, dst);
                 memcpy((void *) dst, (const void *) src, 0x4000);
             }
             output->res = 0;
@@ -231,20 +226,19 @@ int _sceSblAuthMgrSmLoadMultipleSelfBlocks_sceSblServiceMailbox(uint64_t handle,
 }
 
 int sceSblACMgrGetPathId_hook(const char* path) {
-    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblACMgrGetPathId = (int(*)(const char *path)) kdlsym(KERNEL_SYM_SCESBLACMGRGETPATHID);
 
-    printf("sceSblACMgrGetPathId_hook: %s\n", path);
+    // printf("sceSblACMgrGetPathId_hook: %s\n", path);
     if(enableHook6) {
         constexpr const char *selfDir = "/data/self";
         constexpr const char *hostappDir = "/hostapp";
 
         if (strstr(path, selfDir) == path) {
             path = path + strlen(selfDir);
-            printf("sceSblACMgrGetPathId_hook: new path %s\n", path);
+            // printf("sceSblACMgrGetPathId_hook: new path %s\n", path);
         } else if (strstr(path, hostappDir) == path) {
             path = path + strlen(hostappDir);
-            printf("sceSblACMgrGetPathId_hook: new path %s\n", path);
+            // printf("sceSblACMgrGetPathId_hook: new path %s\n", path);
         }
     }
 

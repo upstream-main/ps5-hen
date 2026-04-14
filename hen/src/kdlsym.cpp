@@ -22,6 +22,7 @@
 #include "offsets/3_20.h"
 #include "offsets/3_21.h"
 #include "offsets/4_00.h"
+#include "offsets/4_02.h"
 #include "offsets/4_03.h"
 #include "offsets/4_50.h"
 #include "offsets/4_51.h"
@@ -99,6 +100,8 @@ uint64_t kdlsym(ksym_t sym)
         return g_kernel_base + g_sym_map_321[sym];
     case 0x4000000:
         return g_kernel_base + g_sym_map_400[sym];
+    case 0x4020000:
+        return g_kernel_base + g_sym_map_402[sym];
     case 0x4030000:
         return g_kernel_base + g_sym_map_403[sym];
     case 0x4500000:

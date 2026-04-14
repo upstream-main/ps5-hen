@@ -1,6 +1,5 @@
 #pragma once
 
-// untested
 uint64_t g_sym_map_403[] = {
     0x00C00000,          // KERNEL_SYM_TEXT_END
     0x03E57D00,          // KERNEL_SYM_DMPML4I

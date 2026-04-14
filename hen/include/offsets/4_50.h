@@ -1,6 +1,5 @@
 #pragma once
 
-// untested
 uint64_t g_sym_map_450[] = {
     0x00C00000,          // KERNEL_SYM_TEXT_END
     0x03E57D00,          // KERNEL_SYM_DMPML4I
@@ -23,7 +22,7 @@ uint64_t g_sym_map_450[] = {
     0x02A685A0,          // KERNEL_SYM_CTXTABLE
     0x004B9AE0,          // KERNEL_SYM_MTX_LOCK_FLAGS
     0x004B9F30,          // KERNEL_SYM_MTX_UNLOCK_FLAGS
-    0x009A43D0,          // KERNEL_SYM_RW_MEM
+    0x009A4630,          // KERNEL_SYM_RW_MEM
     0x033EDCB8,          // KERNEL_SYM_ALLPROC
     0x002EFCF0,          // KERNEL_SYM_VM_MAP_LOCK_READ
     0x002EFD40,          // KERNEL_SYM_VM_MAP_UNLOCK_READ

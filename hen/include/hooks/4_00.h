@@ -2,27 +2,26 @@
 
 #include "hook.h"
 
-// untested
 struct hook g_kernel_hooks_400[] = {
     {
         HOOK_TEST_SYS_IS_DEVELOPMENT_MODE,
-        0x9a3afb,
-        0xa33000
+        0x9a3a1b,
+        0xa32f20
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_IS_LOADABLE_CALL_IS_LOADABLE,
         0x2bd2c1,
-        0x932cc0
+        0x932be0
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_AUTH_HEADER,
         0x2bda49,
-        0x932d20
+        0x932c40
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_RESUME,
         0x2be84b,
-        0x932d20
+        0x932c40
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_LOAD_SELF_SEGMENT,
@@ -42,16 +41,16 @@ struct hook g_kernel_hooks_400[] = {
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_IS_LOADABLE_CALL_GET_PATHID,
         0x2bd1ad,
-        0x5ce9a0
+        0x5ce990
     },
     {
         HOOK_FPKG_NPDRM_IOCTL_CMD_5_CALL_SCE_SBL_SERVICE_MAILBOX,
-        0x8e760d,
+        0x8e752d,
         0x57db40
     },
     {
         HOOK_FPKG_NPDRM_IOCTL_CMD_6_CALL_SCE_SBL_SERVICE_MAILBOX,
-        0x8e78c1,
+        0x8e77e1,
         0x57db40
     },
     {
@@ -72,6 +71,6 @@ struct hook g_kernel_hooks_400[] = {
     {
         HOOK_FPKG_SCE_SBL_SERVICE_CRYPT_ASYNC_CALL_CCP_MSG_ENQUEUE,
         0x3126cd,
-        0x7861e0
+        0x786100
     }
 };

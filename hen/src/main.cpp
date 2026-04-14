@@ -34,6 +34,12 @@ int kernel_main(void *td, struct args *args)
 
     // kdlsym assignments
     auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    printf("[HEN] kernel_main fw=0x%lx kernel_base=0x%lx curthread=%p\n", args->fw, args->kernel_base, td);
+    printf("[HEN] symbols text_end=0x%lx allproc=0x%lx mailbox=0x%lx rw_mem=0x%lx\n",
+           kdlsym(KERNEL_SYM_TEXT_END),
+           kdlsym(KERNEL_SYM_ALLPROC),
+           kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX),
+           kdlsym(KERNEL_SYM_RW_MEM));
 
     // Reset hooks before installing new ones
     printf("[HEN] Resetting hooks\n");

@@ -400,7 +400,14 @@ int stage5_patch_kernel(hv_defeat_ctx *ctx) {
     }
 
     int n = 0;
+    int skipped = 0;
     for (auto &p : pit->second) {
+        if (!p.offset || !p.bytes || !p.len) {
+            std::print("  skipping unresolved patch {}\n", p.name ? p.name : "<unnamed>");
+            skipped++;
+            continue;
+        }
+
         uint64_t va = ktext + p.offset;
         uint64_t pa = pmap_kextract(va);
         if (pa && pa < 0x100000000ULL) {
@@ -408,7 +415,11 @@ int stage5_patch_kernel(hv_defeat_ctx *ctx) {
             n++;
         }
     }
-    std::print("  {} patches applied\n", n);
+    std::print("  {} patches applied", n);
+    if (skipped) {
+        std::print(", {} skipped", skipped);
+    }
+    std::print("\n");
 
     return 0;
 }
@@ -495,45 +506,6 @@ int stage7_run_hen(hv_defeat_ctx *ctx) {
     return ret;
 }
 
-int write_memory_to_file(const char *filename, const void *va, size_t size) {
-    int fd;
-    size_t bytes_written_total = 0;
-
-    constexpr auto CHUNK_SIZE = 0x5000;
-
-    uint8_t* buffer = (uint8_t*)malloc(CHUNK_SIZE);
-
-    // Abrir archivo: Escritura, Crear si no existe, Truncar si existe. Permisos 0644.
-    fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd == -1) {
-        perror("Error al abrir el archivo");
-        return -1;
-    }
-
-    while (bytes_written_total < size) {
-        // Calcular cuánto falta por escribir
-        size_t remaining = size - bytes_written_total;
-        // Decidir si escribimos el bloque completo (0x5000) o lo que sobra
-        size_t to_write = (remaining >= CHUNK_SIZE) ? CHUNK_SIZE : remaining;
-
-        // Read from kernel
-        kernel_copyout((uint64_t) va + bytes_written_total, buffer, to_write);
-        // Escribir directamente desde la dirección de memoria al descriptor de archivo
-        ssize_t result = write(fd, buffer, to_write);
-        
-        if (result == -1) {
-            perror("Error durante la escritura");
-            close(fd);
-            return -1;
-        }
-
-        bytes_written_total += result;
-    }
-
-    close(fd);
-    return 0;
-}
-
 int run_hv_defeat(void) {
     hv_defeat_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
@@ -562,14 +534,13 @@ int run_hv_defeat(void) {
 
     if ((r = stage1_tmr_relax(&ctx))) return r;
 
-    // init IOMMU write primitive
     iommu_ctx iommu;
     if ((r = iommu_init(&iommu, ctx.dmap_base, ctx.kbase, ctx.fw))) {
         std::print("[iommu] init failed ({}), falling back to GPU DMA\n", r);
     }
 
     if (r == 0 && (r = iommu_selftest(&iommu, ctx.dmap_base))) {
-        std::print("[iommu] self-test failed, falling back to GPU DMA\n");
+        std::print("[iommu] self-test failed\n");
     }
 
     if ((r = stage2_find_vmcbs(&ctx))) return r;
@@ -619,18 +590,8 @@ int run_hv_defeat(void) {
     uint32_t fw_major = (fw_ver & 0xFF000000) >> 24;
     uint32_t fw_minor = (fw_ver & 0xFF0000) >> 16;
 
-    notify(std::format("Welcome To PS5HEN 1.3\nPlayStation 5 FW: {:d}.{:X}\nBy SpecterDev, f0f, flat_z",
-        fw_major, fw_minor ) );
+    notify( std::format("Welcome To PS5HEN 1.3\nPlayStation 5 FW: {:d}.{:X}\nBy SpecterDev, f0f, flat_z", fw_major, fw_minor ) );
 
-
-    /*uint64_t ktext_base = KERNEL_ADDRESS_TEXT_BASE;
-    std::string kernel_dump_name = std::format( "/mnt/usb0/kernel_{:08X}_{:16X}.bin", fw_ver, ktext_base);
-    uint64_t OFFSET_KERNEL_DATA = 0x0BD0000;
-    uint64_t SIZE_KERNEL_DATA =   0x087B1930;
-    uint64_t SIZE_KTEXT_KDATA = OFFSET_KERNEL_DATA + SIZE_KERNEL_DATA;
-
-    write_memory_to_file(kernel_dump_name.c_str(), (void*) ktext_base, SIZE_KTEXT_KDATA);
-        */
     return 0;
 }
 

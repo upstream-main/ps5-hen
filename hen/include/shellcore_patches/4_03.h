@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 
-// untested
 struct patch g_shellcore_patches_403[] = {
     { /* xor eax, eax; nop; nop; nop */ 0x2731E5, "\x31\xC0\x90\x90\x90", 5 },
     { /* xor eax, eax; nop; nop; nop */ 0x27322C, "\x31\xC0\x90\x90\x90", 5 },

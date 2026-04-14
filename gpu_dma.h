@@ -48,8 +48,6 @@ void gpu_set_offsets(struct gpu_kernel_offsets *offsets);
 
 int gpu_init(void);
 
-int gpu_test(void);
-
 int      gpu_read_phys(uint64_t phys_addr, void *out_buf, uint32_t size);
 uint32_t gpu_read_phys4(uint64_t phys_addr);
 uint64_t gpu_read_phys8(uint64_t phys_addr);

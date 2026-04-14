@@ -2,7 +2,6 @@
 
 #include "hook.h"
 
-// untested
 struct hook g_kernel_hooks_320[] = {
     {
         HOOK_TEST_SYS_IS_DEVELOPMENT_MODE,
@@ -27,17 +26,17 @@ struct hook g_kernel_hooks_320[] = {
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_LOAD_SELF_SEGMENT,
         0x34650a,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_LOAD_SELF_BLOCK,
         0x346a37,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_LOAD_MULTIPLE_SELF_BLOCKS,
         0x3471bf,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FSELF_SCE_SBL_AUTHMGR_IS_LOADABLE_CALL_GET_PATHID,
@@ -47,31 +46,31 @@ struct hook g_kernel_hooks_320[] = {
     {
         HOOK_FPKG_NPDRM_IOCTL_CMD_5_CALL_SCE_SBL_SERVICE_MAILBOX,
         0x8bc573,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FPKG_NPDRM_IOCTL_CMD_6_CALL_SCE_SBL_SERVICE_MAILBOX,
         0x8bd671,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FPKG_PFS_VERIFY_SUPER_BLOCK_CALL_SCE_SBL_SERVICE_MAILBOX,
         0x2a298b,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FPKG_SCE_SBL_PFS_CLEAR_KEY_1_CALL_SCE_SBL_SERVICE_MAILBOX,
         0x2a23c0,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FPKG_SCE_SBL_PFS_CLEAR_KEY_2_CALL_SCE_SBL_SERVICE_MAILBOX,
         0x2a2436,
-        0x5695a0
+        0x55a5a0
     },
     {
         HOOK_FPKG_SCE_SBL_SERVICE_CRYPT_ASYNC_CALL_CCP_MSG_ENQUEUE,
         0x2fe51d,
-        0x759b40
+        0x75ab40
     }
 };

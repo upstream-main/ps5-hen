@@ -404,55 +404,6 @@ int gpu_init(void)
 }
 
 
-int gpu_test(void)
-{
-    if (!s_gpu.initialized) {
-        std::print("[gpu] ERROR: not initialized\n");
-        return -1;
-    }
-
-    std::print("[gpu] test\n");
-
-    // Test 1: Read a known kernel .data value via GPU DMA and compare
-    uint64_t test_va = (uint64_t)KERNEL_ADDRESS_DATA_BASE;
-    uint64_t test_pa = pmap_kextract(test_va);
-    std::print("[gpu] Test target: VA=0x{:x} PA=0x{:x}\n", test_va, test_pa);
-
-    uint64_t kernel_val = kernel_getlong(test_va);
-    std::print("[gpu] kernel_read8 = 0x{:x}\n", kernel_val);
-
-    uint64_t gpu_val = gpu_read_phys8(test_pa);
-    std::print("[gpu] gpu_read8    = 0x{:x}\n", gpu_val);
-
-    if (kernel_val == gpu_val) {
-        std::print("[gpu] *** TEST PASSED: values match ***\n");
-    } else {
-        std::print("[gpu] *** TEST FAILED: values differ ***\n");
-        return -1;
-    }
-
-    // Test 2: Write and read-back test
-    uint64_t test_write_pa = pmap_kextract(s_gpu.transfer_va + 0x100000);
-    uint64_t magic = 0xDEADBEEFCAFEBABEULL;
-
-    std::print("[gpu] Write test: PA=0x{:x} val=0x{:x}\n", test_write_pa, magic);
-    gpu_write_phys8(test_write_pa, magic);
-
-    uint64_t readback = gpu_read_phys8(test_write_pa);
-    std::print("[gpu] Readback    = 0x{:x}\n", readback);
-
-    if (readback == magic) {
-        std::print("[gpu] *** WRITE TEST PASSED ***\n");
-    } else {
-        std::print("[gpu] *** WRITE TEST FAILED ***\n");
-        return -1;
-    }
-
-    std::print("[gpu] tests ok\n");
-    return 0;
-}
-
-
 int gpu_read_phys(uint64_t phys_addr, void *out_buf, uint32_t size)
 {
     return gpu_transfer_physical(phys_addr, out_buf, size, 0);

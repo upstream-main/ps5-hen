@@ -26,20 +26,16 @@ int sceKernelSendNotificationRequest(int, void *, size_t, int);
 
 #include "offsets.h"
 
-// global fw version - set once in stage0, used everywhere
 inline uint32_t& g_fw() { static uint32_t v = 0; return v; }
 
-// kernel r/w
 static inline uint64_t kr8(uint64_t a) { uint64_t v; kernel_copyout(a, &v, 8); return v; }
 static inline uint32_t kr4(uint64_t a) { uint32_t v; kernel_copyout(a, &v, 4); return v; }
 static inline void kw8(uint64_t a, uint64_t v) { kernel_copyin(&v, a, 8); }
 static inline void kw4(uint64_t a, uint32_t v) { kernel_copyin(&v, a, 4); }
 
-// dmap r/w
 static inline uint64_t dr4(uint64_t dmap, uint64_t pa) { return kr4(dmap + pa); }
 static inline void     dw4(uint64_t dmap, uint64_t pa, uint32_t v) { kw4(dmap + pa, v); }
 
-// tmr via ecam b0d18f2
 #ifndef ECAM_B0D18F2
 #define ECAM_B0D18F2 (0xF0000000ULL + 0x18ULL * 0x8000 + 2 * 0x1000)
 #define TMR_INDEX_OFF 0x80
@@ -54,7 +50,6 @@ static inline void tmr_write(uint64_t dmap, uint32_t addr, uint32_t val) {
     dw4(dmap, ECAM_B0D18F2 + TMR_DATA_OFF, val);
 }
 
-// notification
 static inline void notify(const std::string &msg) {
     struct { char pad[45]; char msg[3075]; } req{};
     std::memcpy(req.msg, msg.c_str(), std::min(msg.size(), sizeof(req.msg) - 1));
@@ -76,7 +71,6 @@ static inline void unpin() {
     cpuset_setaffinity(3, 1, -1, 0x10, (const cpuset_t *)m);
 }
 
-// dmap
 static inline uint64_t get_dmap_base() {
     static uint64_t c = 0;
     if (!c) {
@@ -93,7 +87,6 @@ static inline uint64_t get_dmap_addr(uint64_t pa) {
     return get_dmap_base() + pa;
 }
 
-// pmap_kextract
 static inline uint64_t pmap_kextract(uint64_t va) {
     uint64_t kb = (uint64_t)KERNEL_ADDRESS_DATA_BASE - fw_off(g_fw(), "KDATA_OFFSET");
     int32_t dmpml4i, dmpdpi, pml4pml4i;
@@ -115,7 +108,6 @@ static inline uint64_t pmap_kextract(uint64_t va) {
     return (pte & 0xFFFFFFFFFF000ULL) | (va & 0x3FFFULL);
 }
 
-// page table bits
 enum pde_shift {
     PDE_PRESENT = 0, PDE_RW, PDE_USER, PDE_WRITE_THROUGH,
     PDE_CACHE_DISABLE, PDE_ACCESSED, PDE_DIRTY, PDE_PS, PDE_GLOBAL,
@@ -135,7 +127,6 @@ enum pde_shift {
 #define SET_PDE_BIT(pde, name)       ((pde) |= (PDE_##name##_MASK << PDE_##name))
 #define CLEAR_PDE_BIT(pde, name)     ((pde) &= ~(PDE_##name##_MASK << PDE_##name))
 
-// page table walk
 static inline uint64_t find_pml4e(uint64_t pmap, uint64_t va, uint64_t *out) {
     uint64_t pm_pml4;
     kernel_copyout(pmap + fw_off(g_fw(), "PMAP_PM_PML4"), &pm_pml4, 8);

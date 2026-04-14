@@ -42,8 +42,8 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0101_HV_VCPU_CPUID",      0x128},
     {"0101_VMSPACE_VM_VMID",     0x1E4},
     {"0101_VMSPACE_VM_PMAP",     0x1D0},
-    {"0102_PMAP_PM_PML4",        0x020},
-    {"0102_PMAP_PM_CR3",         0x028},
+    {"0101_PMAP_PM_PML4",        0x020},
+    {"0101_PMAP_PM_CR3",         0x028},
     {"0101_DATA_BASE_GVMSPACE",      0},  // TODO
     {"0101_KERNEL_OFF_CODE_CAVE",    0x0044000},
     {"0101_PPR_SYSENT",        0x1CAA7B0},
@@ -210,7 +210,6 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0200_GADGET_JMP_PTR_RSI",      0x0042000},
     {"0200_SMP_RENDEZVOUS",          0x9EFD90},
     {"0200_IOMMU_SOFTC",             0x425D718},
-    // 2.00 uses GPU DMA, no A53 offsets
 
     // FW 2.20
     {"0220_KDATA_OFFSET",      0x1B80000},
@@ -342,14 +341,14 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0300_KERNEL_TEXT_SIZE",  0x0BD0000},
     {"0300_BUS_DATA_DEVICES", 0x1DF1678},
     {"0300_HV_BSS_OFF",       0x16000},   
-    {"0300_HV_VCPU_ARRAY_OFF", 0x5D0},   // per-core context array within BSS
-    {"0300_HV_VCPU_STRIDE",    0x320},   // per-core context size
-    {"0300_HV_VCPU_VMCB_PTR",  0x08},    // VMCB pointer offset within per-core ctx
+    {"0300_HV_VCPU_ARRAY_OFF", 0x5D0},
+    {"0300_HV_VCPU_STRIDE",    0x320},
+    {"0300_HV_VCPU_VMCB_PTR",  0x08},
     {"0300_VMSPACE_VM_VMID",     0x1E4},
     {"0300_VMSPACE_VM_PMAP",     0x1D0},
     {"0300_PMAP_PM_PML4",        0x020},
     {"0300_PMAP_PM_CR3",         0x028},
-    {"0300_PPR_SYSENT",        0x0D3F720},  // untested
+    {"0300_PPR_SYSENT",        0x0D3F720},
     {"0300_DATA_BASE_GVMSPACE",      0x06423F80},
     {"0300_KERNEL_OFF_CODE_CAVE",    0x0044000},
     {"0300_GADGET_JMP_PTR_RSI",  0x0042000},
@@ -374,7 +373,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0310_VMSPACE_VM_PMAP",     0x1D0},
     {"0310_PMAP_PM_PML4",        0x020},
     {"0310_PMAP_PM_CR3",         0x028},
-    {"0310_PPR_SYSENT",        0x0D3F720},  // untested
+    {"0310_PPR_SYSENT",        0x0D3F720},
     {"0310_DATA_BASE_GVMSPACE",      0x06423F80},
     {"0310_KERNEL_OFF_CODE_CAVE",    0x0044000},
     {"0310_GADGET_JMP_PTR_RSI",  0x0042000},
@@ -399,7 +398,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0320_VMSPACE_VM_PMAP",     0x1D0},
     {"0320_PMAP_PM_PML4",        0x020},
     {"0320_PMAP_PM_CR3",         0x028},
-    {"0320_PPR_SYSENT",        0x0D3F720},  // untested
+    {"0320_PPR_SYSENT",        0x0D3F720},
     {"0320_DATA_BASE_GVMSPACE", 0x06423F80},
     {"0320_KERNEL_OFF_CODE_CAVE",    0x0044000},
     {"0320_GADGET_JMP_PTR_RSI",  0x0042000},
@@ -424,7 +423,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0321_VMSPACE_VM_PMAP",     0x1D0},
     {"0321_PMAP_PM_PML4",        0x020},
     {"0321_PMAP_PM_CR3",         0x028},
-    {"0321_PPR_SYSENT",        0x0D3F720},  // untested
+    {"0321_PPR_SYSENT",        0x0D3F720},
     {"0321_DATA_BASE_GVMSPACE",      0x06423F80},
     {"0321_KERNEL_OFF_CODE_CAVE",    0x0044000},
     {"0321_GADGET_JMP_PTR_RSI",  0x0042000},
@@ -451,7 +450,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0400_PMAP_PM_CR3",         0x028},
     {"0400_DATA_BASE_GVMSPACE", 0x064C3F80},
     {"0400_KERNEL_OFF_CODE_CAVE",    0x0044000},
-    {"0400_PPR_SYSENT",        0x0D709C0},  // untested
+    {"0400_PPR_SYSENT",        0x0D709C0},
     {"0400_GADGET_JMP_PTR_RSI",  0x0042000},
     {"0400_A53_MDBG_BL_VA",      0x109854},
     {"0400_IOMMU_SOFTC",         0x33C7680},
@@ -476,7 +475,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0402_PMAP_PM_CR3",         0x028},
     {"0402_DATA_BASE_GVMSPACE", 0x064C3F80},
     {"0402_KERNEL_OFF_CODE_CAVE",    0x0044000},
-    {"0402_PPR_SYSENT",        0x0D709C0},  // untested
+    {"0402_PPR_SYSENT",        0x0D709C0},
     {"0402_GADGET_JMP_PTR_RSI",  0x0042000},
     {"0402_A53_MDBG_BL_VA",      0x109854},
     {"0402_IOMMU_SOFTC",         0x33C7680},
@@ -504,7 +503,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0403_VMSPACE_VM_VMID",     0x1E4},
     {"0403_VMSPACE_VM_PMAP",     0x1D0},
     {"0403_PMAP_PM_PML4",        0x020},
-    {"0403_PMAP_PM_CR3",         0x028}, // The PML4 offset in PMAP store is wrong. PML4 == CR3 + DMAP
+    {"0403_PMAP_PM_CR3",         0x028},
     {"0403_DATA_BASE_GVMSPACE", 0x064C3F80},
 
     // FW 4.50
@@ -551,7 +550,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0451_PMAP_PM_CR3",         0x028},
     {"0451_DATA_BASE_GVMSPACE", 0x064C3F80},
     {"0451_KERNEL_OFF_CODE_CAVE",    0x0044000},
-    {"0451_PPR_SYSENT",        0x0D709C0},  // untested
+    {"0451_PPR_SYSENT",        0x0D709C0},
     {"0451_GADGET_JMP_PTR_RSI",  0x0042000},
     {"0451_A53_MDBG_BL_VA",      0x109854},
     {"0451_IOMMU_SOFTC",         0x33C7680},

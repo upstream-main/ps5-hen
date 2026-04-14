@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 
-struct patch g_shellcore_patches_400[] = {
+struct patch g_shellcore_patches_402[] = {
     { 0x974FEE, "\x52\xEB\x08", 3 },
     { 0x974FF9, "\xE8\xD2\xFB\xFF\xFF\x58\xC3", 7 },
     { 0x974BC1, "\x31\xC0\x50\xEB\xE3", 5 },
@@ -16,8 +16,8 @@ struct patch g_shellcore_patches_400[] = {
     { 0x1A12D1, "\xE8\xEA\x88\x47\x00\x31\xC9\xFF\xC1\xE9\xF4\x02\x00\x00", 14 },
     { 0x1A15D3, "\x83\xF8\x02\x0F\x43\xC1\xE9\x29\xFA\xFF\xFF", 11 },
     { 0x1A0FE5, "\xE9\xE7\x02\x00\x00", 5 },
-    { 0x12B5EA0, "\x31\xC0\xC3", 3 }, /* VR2 Min Fw Check */
-    { 0x81CA56, "\x90\x90\x90\x90\x90", 5 }, /* disable game error message */
+    { /* VR2 Min Fw Check */ 0x12B5EB0, "\x31\xC0\xC3", 3 },
+    { /* Disable game error message */ 0x81CA56, "\x90\x90\x90\x90\x90", 5 },
     { /* PS4 Disc Installer Patch 1 */ 0x267DBB, "\x90\xE9", 2 },
     { /* PS5 Disc Installer Patch 1 */ 0x267E52, "\x90\xE9", 2 },
     { /* PS4 PKG Installer Patch 1 */ 0x267F6B, "\xEB", 1 },

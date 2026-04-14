@@ -6,7 +6,104 @@
 #include "util.h"
 
 uint64_t g_dmap_base = 0;
+uint64_t g_proc_comm_offset = 0;
 void *curthread;
+
+static void *get_curproc()
+{
+    if (!curthread) {
+        return NULL;
+    }
+
+    return (void *) *(uint64_t *) ((char *) curthread + THREAD_OFFSET_TD_PROC);
+}
+
+static int is_printable_ascii(char c)
+{
+    return (c >= 0x20 && c <= 0x7E);
+}
+
+static int is_reasonable_proc_name(const char *name)
+{
+    if (!name || !name[0]) {
+        return 0;
+    }
+
+    for (size_t i = 0; i < 32; i++) {
+        char c = name[i];
+
+        if (c == '\0') {
+            return 1;
+        }
+
+        if (!is_printable_ascii(c)) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static uint64_t resolve_proc_comm_offset()
+{
+    static const uint8_t proc_comm_sign[] = { 0xCE, 0xFA, 0xEF, 0xBE, 0xCC, 0xBB };
+    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+
+    if (g_proc_comm_offset != 0) {
+        return g_proc_comm_offset;
+    }
+
+    void *curproc = get_curproc();
+    if (curproc != NULL) {
+        auto proc_data = (uint8_t *) curproc;
+
+        for (size_t i = 0; i <= (0x1000 - sizeof(proc_comm_sign)); i++) {
+            size_t j = 0;
+            for (; j < sizeof(proc_comm_sign); j++) {
+                if (proc_data[i + j] != proc_comm_sign[j]) {
+                    break;
+                }
+            }
+
+            if (j == sizeof(proc_comm_sign)) {
+                uint64_t candidate = i + 0x8;
+                auto proc_name = (char *) ((char *) curproc + candidate);
+
+                if (is_reasonable_proc_name(proc_name)) {
+                    g_proc_comm_offset = candidate;
+                    printf("[HEN] [PROC] resolved runtime p_comm = 0x%lx\n", g_proc_comm_offset);
+                    return g_proc_comm_offset;
+                }
+            }
+        }
+
+        printf("[HEN] [PROC] runtime p_comm scan failed, falling back to 0x%x\n", PROC_OFFSET_P_COMM);
+    } else {
+        printf("[HEN] [PROC] curthread missing, falling back to 0x%x\n", PROC_OFFSET_P_COMM);
+    }
+
+    g_proc_comm_offset = PROC_OFFSET_P_COMM;
+    return g_proc_comm_offset;
+}
+
+static void dump_proc_candidates(void *allproc, uint64_t proc_comm_offset, int max_entries)
+{
+    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    void *p = allproc;
+
+    for (int i = 0; p && i < max_entries; i++) {
+        auto proc_name = (char *) ((char *) p + proc_comm_offset);
+        int proc_pid = *(int *) ((char *) p + PROC_OFFSET_P_PID);
+
+        if (is_reasonable_proc_name(proc_name)) {
+            printf("[HEN] [PROC] candidate[%d] proc=%p pid=%d name='%s'\n", i, p, proc_pid, proc_name);
+        } else {
+            printf("[HEN] [PROC] candidate[%d] proc=%p pid=%d name=<invalid>\n", i, p, proc_pid);
+        }
+
+        p = (void *) *(uint64_t *) p;
+    }
+}
 
 void init_dmap_resolve()
 {
@@ -32,30 +129,41 @@ void *find_proc_by_name(const char *name)
 {
     void *p;
     char *proc_name;
-    //int proc_pid;
+    uint64_t proc_comm_offset;
+    int proc_pid;
+    int scanned = 0;
 
-    //auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto allproc = (void *) *(uint64_t *) kdlsym(KERNEL_SYM_ALLPROC);
 
     if (!name) {
         return NULL;
     }
 
-    //printf("find_proc_by_name: proc0 = %p\n", allproc);
+    proc_comm_offset = resolve_proc_comm_offset();
+
+    if (!allproc) {
+        printf("[HEN] [PROC] allproc head is null while looking for '%s'\n", name);
+        return NULL;
+    }
 
     p = allproc;
     while (p) {
-        proc_name = (char *) ((char *) (p) + PROC_OFFSET_P_COMM);
-        //proc_pid  = *(int *) ((char *) (p) + PROC_OFFSET_P_PID);
-        //printf("  proc '%s' (pid: 0x%x)\n", proc_name, proc_pid);
+        proc_name = (char *) ((char *) (p) + proc_comm_offset);
+        proc_pid  = *(int *) ((char *) (p) + PROC_OFFSET_P_PID);
+        scanned++;
 
         if (!strncmp(proc_name, name, strlen(name))) {
+            printf("[HEN] [PROC] matched '%s' at %p pid=%d after %d entries\n", name, p, proc_pid, scanned);
             return p;
         }
 
         p = (void *) *(uint64_t *) p;
     }
 
+    printf("[HEN] [PROC] failed to find '%s' after %d entries (allproc=%p p_comm=0x%lx)\n",
+           name, scanned, allproc, proc_comm_offset);
+    dump_proc_candidates(allproc, proc_comm_offset, 12);
     return NULL;
 }
 

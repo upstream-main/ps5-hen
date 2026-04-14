@@ -2,7 +2,6 @@
 
 #include "hook.h"
 
-// untested
 struct hook g_kernel_hooks_403[] = {
     {
         HOOK_TEST_SYS_IS_DEVELOPMENT_MODE,

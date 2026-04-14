@@ -79,16 +79,52 @@ const uint8_t g_FakeKeySeed[] =
     0x46, 0x41, 0x4B, 0x45, 0x46, 0x41, 0x4B, 0x45, 0x46, 0x41, 0x4B, 0x45, 0x46, 0x41, 0x4B, 0x45,
 };
 
-int npdrm_cmd_5_sceSblServiceMailbox(uint64_t handle, const NpDrmCmd5* input, NpDrmCmd5* output) {
-    //auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
-    auto sceSblServiceMailbox   = (int (*)(uint64_t handle, void *in, void *out)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
+static bool diag_take_hit(uint32_t &counter, uint32_t limit = 4)
+{
+    counter++;
+    return counter <= limit;
+}
 
-    //printf("npdrm_cmd_5_sceSblServiceMailbox pre call\n");
+static uint64_t fake_key_mask_snapshot()
+{
+    return __atomic_load_n(&shared_area.bitmask, __ATOMIC_ACQUIRE);
+}
+
+static uint32_t popcount64(uint64_t value)
+{
+    uint32_t count = 0;
+    while (value != 0) {
+        value &= (value - 1);
+        count++;
+    }
+    return count;
+}
+
+static uint32_t fake_key_inuse_count()
+{
+    return popcount64(fake_key_mask_snapshot());
+}
+
+int npdrm_cmd_5_sceSblServiceMailbox(uint64_t handle, const NpDrmCmd5* input, NpDrmCmd5* output) {
+    auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    auto sceSblServiceMailbox   = (int (*)(uint64_t handle, void *in, void *out)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
+    static uint32_t cmd5_hits = 0;
+    bool log_hit = diag_take_hit(cmd5_hits);
+    uint64_t fw = get_fw_version();
+
+    if (log_hit) {
+        printf("[HEN] [FPKG] [CMD5] hit #%u fw=0x%lx handle=0x%lx rif_pa=0x%lx\n", cmd5_hits, fw, handle, input->rif_pa);
+    }
 
     int res = sceSblServiceMailbox(handle, (void *) input, output);
+    if (log_hit || res != 0 || output->res != 0) {
+        // printf("[HEN] [FPKG] [CMD5] post mailbox res=0x%x output->res=0x%x\n", res, output->res);
+    }
     if(output->res == 0x800F0A01) {
-        //printf("fixup npdrm cmd 5\n");
         auto layout = reinterpret_cast<RifCmd5MemoryLayout*>(get_dmap_addr(input->rif_pa));
+        // printf("[HEN] [FPKG] [CMD5] entering fixup rif.type=0x%x sku=0x%x\n",
+        //         layout->rif.type,
+        //         __builtin_bswap16(layout->rif.skuFlag));
         if(layout->rif.type == 2) {
 
             layout->output.version = __builtin_bswap16(layout->rif.version);
@@ -118,6 +154,12 @@ int npdrm_cmd_5_sceSblServiceMailbox(uint64_t handle, const NpDrmCmd5* input, Np
 
             output->res = 0;
             res = 0;
+
+            // printf("[HEN] [FPKG] [CMD5] fixed debug RIF output->res=0x%x sku=0x%x\n",
+            //     output->res,
+            //     layout->output.skuFlag);
+        } else {
+            // printf("[HEN] [FPKG] [CMD5] fixup skipped rif.type=0x%x\n", layout->rif.type);
         }
     }
 
@@ -125,21 +167,33 @@ int npdrm_cmd_5_sceSblServiceMailbox(uint64_t handle, const NpDrmCmd5* input, Np
 }
 
 int npdrm_cmd_6_sceSblServiceMailbox(uint64_t handle, const NpDrmCmd6* input, NpDrmCmd6* output) {
-    //auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblServiceMailbox   = (int (*)(uint64_t handle, void *in, void *out)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
     auto bnet_crypto_aes_cbc_cfb128_decrypt = (void (*)(void *, void *, size_t, void *, size_t, void *)) kdlsym(KERNEL_SYM_BNET_CRYPTO_AES_CBC_CFB128_DECRYPT);
+    static uint32_t cmd6_hits = 0;
+    bool log_hit = diag_take_hit(cmd6_hits);
+    uint64_t fw = get_fw_version();
 
-    //printf("npdrm_cmd_6_sceSblServiceMailbox pre call\n");
+    if (log_hit) {
+        printf("[HEN] [FPKG] [CMD6] hit #%u fw=0x%lx handle=0x%lx rif_pa=0x%lx\n", cmd6_hits, fw, handle, input->rif_pa);
+    }
 
     int res = sceSblServiceMailbox(handle, (void *) input, output);
+    if (log_hit || res != 0 || output->res != 0) {
+        // printf("[HEN] [FPKG] [CMD6] post mailbox res=0x%x output->res=0x%x\n", res, output->res);
+    }
     if(output->res == 0x800F0A01) {
-        //printf("fixup npdrm cmd\n");
         auto va = reinterpret_cast<Rif*>(get_dmap_addr(input->rif_pa));
+        // printf("[HEN] [FPKG] [CMD6] entering fixup rif.type=0x%x\n", va->type);
         if(va->type == 0x2) {
             bnet_crypto_aes_cbc_cfb128_decrypt(va->rifSecret, va->rifSecret, sizeof(va->rifSecret), (void *) rif_debug_key, 128, va->rifIv);
             memcpy(output->unk10, &va->rifSecret[0x70], 0x10);
             memcpy(output->unk20, &va->rifSecret[0x80], 0x10);
             output->res = 0;
+
+            // printf("[HEN] [FPKG] [CMD6] fixed debug RIF output->res=0x%x\n", output->res);
+        } else {
+            // printf("[HEN] [FPKG] [CMD6] fixup skipped rif.type=0x%x\n", va->type);
         }
 
     }
@@ -249,16 +303,23 @@ void aes_xts_4096_dec(void *buffer, void *out, uint32_t num_sectors, uint32_t st
 int verifySuperBlock_sceSblServiceMailbox(uint64_t handle, const PfsmgrCmd11* input, PfsmgrCmd11 *output)
 {
     int ret;
+    static uint32_t verify_hits = 0;
+    bool log_hit = diag_take_hit(verify_hits);
 
     auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblServiceMailbox = (int (*)(uint64_t handle, void *in, void *out)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
     auto Sha256Hmac = (void (*)(void *hash, void *data, size_t data_sz, void *key, size_t key_size)) kdlsym(KERNEL_SYM_SHA256_HMAC);
 
-    //printf("sceSblPfsSetKeys verify superblock\n");
+    if (log_hit) {
+        printf("[HEN] [FPKG] [PFS] verifySuperBlock hit #%u handle=0x%lx tablePa=0x%lx headerPa=0x%lx\n",
+               verify_hits, handle, input->tablePa, input->headerPa);
+    }
 
     ret = sceSblServiceMailbox(handle, (void *) input, (void *) output);
+    if (log_hit || ret != 0 || output->res != 0) {
+        printf("[HEN] [FPKG] [PFS] verifySuperBlock mailbox ret=0x%x output->res=0x%x\n", ret, output->res);
+    }
     if (ret != 0 || output->res != 0) {
-        //printf("verifySuperBlock_sceSblServiceMailbox: register fake keys\n");
         auto tablePA    = input->tablePa;
         auto headerPA   = input->headerPa;
         auto header     = (uint8_t *) get_dmap_addr(headerPA);
@@ -313,13 +374,38 @@ int verifySuperBlock_sceSblServiceMailbox(uint64_t handle, const PfsmgrCmd11* in
             Sha256Hmac(hmac_key, pfs_seed, 0x14, ekpfs, 0x20);
 
             int key0 = register_fake_key((const char *) &xts_key);
+            if (key0 < 0) {
+                printf("[HEN] [FPKG] [PFS] fake key registration failed for XTS in_use=%u mask=0x%lx\n",
+                       fake_key_inuse_count(),
+                       fake_key_mask_snapshot());
+                return ret;
+            }
+
             int key1 = register_fake_key((const char *) &hmac_key);
+            if (key1 < 0) {
+                unregister_fake_key(key0);
+                printf("[HEN] [FPKG] [PFS] fake key registration failed for HMAC, rolled back key0=%d in_use=%u mask=0x%lx\n",
+                       key0,
+                       fake_key_inuse_count(),
+                       fake_key_mask_snapshot());
+                return ret;
+            }
+
             output->keyHandle0 = IDX_TO_HANDLE(key0);
             output->keyHandle1 = IDX_TO_HANDLE(key1);
 
-            //printf("verifySuperBlock_sceSblServiceMailbox: key0 = 0x%x (handle = 0x%x), key1 = 0x%x (handle = 0x%x)\n", key0, output->keyHandle0, key1, output->keyHandle1);
+            printf("[HEN] [FPKG] [PFS] registered fake keys key0=%d handle0=0x%x key1=%d handle1=0x%x in_use=%u mask=0x%lx data_size=0x%lx\n",
+                   key0,
+                   output->keyHandle0,
+                   key1,
+                   output->keyHandle1,
+                   fake_key_inuse_count(),
+                   fake_key_mask_snapshot(),
+                   table->data_size);
             output->res = 0;
             ret = 0;
+        } else {
+            printf("[HEN] [FPKG] [PFS] unsupported key blob size 0x%lx\n", table->data_size);
         }
     }
 
@@ -441,11 +527,19 @@ int sceSblServiceCryptAsync_hook(void *async_req) {
   struct ccp_common *next;
   //struct ccp_req *req;
   int idx = -1;
+  static uint32_t crypt_req_hits = 0;
+  static uint32_t crypt_hmac_hits = 0;
+  static uint32_t crypt_xts_hits = 0;
 
   //req = (struct ccp_req *)async_req;
   msg = (struct ccp_common *)(*(uint64_t *)(async_req));
   
+  auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
   auto sceSblServiceCryptAsync = (int (*)(void *req)) kdlsym(KERNEL_SYM_SCE_SBL_SERVICE_CRYPT_ASYNC); 
+
+  if (diag_take_hit(crypt_req_hits)) {
+    printf("[HEN] [FPKG] [CRYPT] req #%u async_req=%p msg=%p\n", crypt_req_hits, async_req, msg);
+  }
 
   while (msg) {
     next = (struct ccp_common *)(*(uint64_t *)((uint64_t)(msg) + 0x140));
@@ -454,6 +548,7 @@ int sceSblServiceCryptAsync_hook(void *async_req) {
       // SHA256 HMAC with key handle
       struct ccp_hmac *hmac_msg = (struct ccp_hmac *)msg;
       idx = HANDLE_TO_IDX(hmac_msg->key_index);
+      crypt_hmac_hits++;
 
       if (idx >= 0) {
         char hmac_key[0x20];
@@ -462,11 +557,20 @@ int sceSblServiceCryptAsync_hook(void *async_req) {
         memcpy(hmac_msg->key, hmac_key, 0x20);
         msg->cmd &= ~0x100000; // key handle
         msg->cmd &= ~0x80000000; // a53
+        // printf("[HEN] [FPKG] [CRYPT] HMAC fake key idx=%d data_size=0x%lx cmd=0x%x\n",
+        //        idx,
+        //        hmac_msg->data_size,
+        //        msg->cmd);
+      } else if (crypt_hmac_hits <= 4) {
+        // printf("[HEN] [FPKG] [CRYPT] HMAC pass-through key_index=0x%x cmd=0x%x\n",
+        //        hmac_msg->key_index,
+        //        msg->cmd);
       }
     } else if ((msg->cmd & 0x7FFFF7FF) == 0x2108000) {
       // AES-XTS with key handle
       struct ccp_xts *xts_msg = (struct ccp_xts *)msg;
       idx = HANDLE_TO_IDX(xts_msg->key_index);
+      crypt_xts_hits++;
 
       if (idx >= 0) {
         char xts_key[0x20];
@@ -476,6 +580,17 @@ int sceSblServiceCryptAsync_hook(void *async_req) {
         memcpy(xts_msg->key + 0x10, xts_key, 0x10);
         msg->cmd &= ~0x100000; // key handle
         msg->cmd &= ~0x80000000; // a53
+        // printf("[HEN] [FPKG] [CRYPT] XTS fake key idx=%d sectors=0x%x start=0x%lx cmd=0x%x\n",
+        //        idx,
+        //        xts_msg->num_sectors,
+        //        xts_msg->start_sector,
+        //        msg->cmd);
+      } else if (crypt_xts_hits <= 4) {
+        // printf("[HEN] [FPKG] [CRYPT] XTS pass-through key_index=0x%x sectors=0x%x start=0x%lx cmd=0x%x\n",
+        //        xts_msg->key_index,
+        //        xts_msg->num_sectors,
+        //        xts_msg->start_sector,
+        //        msg->cmd);
       }
     }
 
@@ -487,19 +602,30 @@ int sceSblServiceCryptAsync_hook(void *async_req) {
 
 int sceSblPfsClearKey_sceSblServiceMailbox(uint64_t handle, const ClearKey* input, ClearKey* output) 
 {
-    //auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
     auto sceSblServiceMailbox   = (int (*)(uint64_t handle, void *in, void *out)) kdlsym(KERNEL_SYM_SCESBLSERVICEMAILBOX);
-
-    uint32_t key;
-
-    //printf("sceSblPfsClearKey_sceSblServiceMailbox\n");
-
-    key = HANDLE_TO_IDX(input->keyHandle);
-    if (key < 0)
+    static uint32_t clear_passthrough_hits = 0;
+    int key = HANDLE_TO_IDX(input->keyHandle);
+    if (key < 0) {
+        if (diag_take_hit(clear_passthrough_hits)) {
+            printf("[HEN] [FPKG] [PFS] clear pass-through handle=0x%x req_handle=0x%lx\n",
+                   input->keyHandle,
+                   handle);
+        }
         return sceSblServiceMailbox(handle, (void *) input, output);
+    }
 
-    //printf("sceSblPfsClearKey_sceSblServiceMailbox: key idx = 0x%x, clearing\n", key);
+    printf("[HEN] [FPKG] [PFS] clear fake key idx=%d handle=0x%x req_handle=0x%lx in_use_before=%u mask_before=0x%lx\n",
+           key,
+           input->keyHandle,
+           handle,
+           fake_key_inuse_count(),
+           fake_key_mask_snapshot());
     unregister_fake_key(key);
+    printf("[HEN] [FPKG] [PFS] cleared fake key idx=%d in_use_after=%u mask_after=0x%lx\n",
+           key,
+           fake_key_inuse_count(),
+           fake_key_mask_snapshot());
     output->keyHandle = 0;
     output->res = 0;
     return 0;
@@ -508,6 +634,8 @@ int sceSblPfsClearKey_sceSblServiceMailbox(uint64_t handle, const ClearKey* inpu
 void apply_fpkg_hooks()
 {
     auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
+    int crypt_hook_count = 0;
+    uint64_t crypt_target = kdlsym(KERNEL_SYM_SCE_SBL_SERVICE_CRYPT_ASYNC);
 
     printf("[HEN] [FPKG] npdrm_ioctl(cmd=5) -> sceSblServiceMailbox()\n");
     install_hook(HOOK_FPKG_NPDRM_IOCTL_CMD_5_CALL_SCE_SBL_SERVICE_MAILBOX, (void *) &npdrm_cmd_5_sceSblServiceMailbox);
@@ -525,21 +653,29 @@ void apply_fpkg_hooks()
     install_hook(HOOK_FPKG_SCE_SBL_PFS_CLEAR_KEY_2_CALL_SCE_SBL_SERVICE_MAILBOX, (void *) &sceSblPfsClearKey_sceSblServiceMailbox);
 
     // Install hook on all calls to sceSblServiceCryptAsync()
-    printf("[HEN] [FPKG] installing hooks to sceSblServiceCryptAsync() [0x%lx, 0x%lx]\n", ktext(0), kdlsym(KERNEL_SYM_TEXT_END));
+    printf("[HEN] [FPKG] installing hooks to sceSblServiceCryptAsync() target=0x%lx scan=[0x%lx, 0x%lx)\n",
+           crypt_target,
+           ktext(0),
+           kdlsym(KERNEL_SYM_TEXT_END));
     for (uint64_t scan_ptr = ktext(0); scan_ptr < kdlsym(KERNEL_SYM_TEXT_END); scan_ptr++) {
         uint8_t *scan = (uint8_t *) scan_ptr;
         int32_t target_rel32;
         int32_t rel32;
 
         if (scan[0] == 0xE8) {
-            target_rel32 = (int32_t) ((uint64_t) (kdlsym(KERNEL_SYM_SCE_SBL_SERVICE_CRYPT_ASYNC)) - scan_ptr) - 5;
+            target_rel32 = (int32_t) ((uint64_t) (crypt_target) - scan_ptr) - 5;
             rel32 = *(int32_t *) (scan + 1);
 
             if (rel32 == target_rel32) {
                 install_raw_hook(scan_ptr, (void *) &sceSblServiceCryptAsync_hook);
+                crypt_hook_count++;
             }
         }
     }
 
+    printf("[HEN] [FPKG] installed %d raw crypt hooks\n", crypt_hook_count);
+    if (crypt_hook_count == 0) {
+        printf("[HEN] [FPKG] WARNING: no sceSblServiceCryptAsync() callsites matched\n");
+    }
     printf("[HEN] [FPKG] done\n");
 }

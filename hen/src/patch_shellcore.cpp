@@ -23,6 +23,7 @@
 #include "shellcore_patches/3_20.h"
 #include "shellcore_patches/3_21.h"
 #include "shellcore_patches/4_00.h"
+#include "shellcore_patches/4_02.h"
 #include "shellcore_patches/4_03.h"
 #include "shellcore_patches/4_50.h"
 #include "shellcore_patches/4_51.h"
@@ -82,12 +83,20 @@ int proc_rw_mem(void *p, off_t procAddr, size_t sz, void *kAddr, size_t *ioSz, i
     _uio.uio_td = curthread;
 
     // Read/Write memory (ignoring faults)
-    // printf("debug_rwmem: try\n");
     int ret = debug_rwmem(p, &_uio);
-    // printf("debug_rwmem: ret = 0x%x\n", ret);
 
     if (ioSz) {
         *ioSz = (sz - _uio.uio_resid);
+    }
+
+    if (ret != 0) {
+        printf("[HEN] [SHELLCORE] proc_rw_mem %s failed ret=0x%x proc=%p addr=0x%lx sz=0x%lx done=0x%lx\n",
+               write ? "write" : "read",
+               ret,
+               p,
+               procAddr,
+               sz,
+               sz - _uio.uio_resid);
     }
 
     return ret;
@@ -108,6 +117,7 @@ uint64_t shellcore_get_addr(void *shellcore_proc)
     uint8_t entry_prot;
     char *entry_name;
     uint64_t addr;
+    int scanned_entries;
 
     // kdlsym function pointers
     auto printf                 = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
@@ -117,7 +127,11 @@ uint64_t shellcore_get_addr(void *shellcore_proc)
 
     // Get the process vm map
     vm_map = get_proc_vmmap(shellcore_proc);
-    // printf("[HEN] [SHELLCORE] vm_map = %p\n", vm_map);
+    if (!vm_map) {
+        printf("[HEN] [SHELLCORE] shellcore vm_map is null\n");
+        return 0;
+    }
+    printf("[HEN] [SHELLCORE] vm_map = %p\n", vm_map);
 
     // Lock the vm map
     _vm_map_lock_read(vm_map, "", 0);    
@@ -132,12 +146,14 @@ uint64_t shellcore_get_addr(void *shellcore_proc)
 
     first_entry = entry;
     addr = 0;
+    scanned_entries = 0;
 
     // Iterate over all of the entries and check the name, offset, and protection
     do {
         entry_name  = (char *) ((char *) (entry) + VM_ENTRY_OFFSET_NAME);
         entry_start = *(uint64_t *) ((char *) (entry) + VM_ENTRY_OFFSET_START);
         entry_prot  = *(uint8_t *) ((char *) (entry) + VM_ENTRY_OFFSET_PROT);
+        scanned_entries++;
 
         printf("  vm entry (start=0x%lx, prot=0x%x), '%s'\n", entry_start, entry_prot, entry_name);
         entry = (void *) *(uint64_t *) ((char *) (entry) + VM_ENTRY_OFFSET_NEXT);
@@ -147,12 +163,17 @@ uint64_t shellcore_get_addr(void *shellcore_proc)
             //     printf("  +%02x: 0x%lx\n", i, *(uint64_t *) ((char *) (entry) + i));
             // }
             addr = entry_start;
+            printf("[HEN] [SHELLCORE] selected executable entry after %d vm entries\n", scanned_entries);
             break;
         }
     } while (entry != NULL && entry != first_entry);
 
     // Unlock the vm map
     _vm_map_unlock_read(vm_map, "", 0);
+
+    if (!addr) {
+        printf("[HEN] [SHELLCORE] no executable vm entry found after %d entries\n", scanned_entries);
+    }
 
     // return the found address
     return addr;
@@ -170,6 +191,9 @@ void apply_shellcore_patches()
     void *shellcore_proc;
     uint64_t shellcore_base_addr;
     int num_patches;
+    int shellcore_pid;
+    int patches_ok;
+    int patches_failed;
 
     // Get kdlsym function pointers
     auto printf = (void (*)(const char *fmt, ...)) kdlsym(KERNEL_SYM_PRINTF);
@@ -248,6 +272,10 @@ void apply_shellcore_patches()
         patches = (struct patch *) &g_shellcore_patches_400;
         num_patches = sizeof(g_shellcore_patches_400) / sizeof(struct patch);
         break;
+    case 0x4020000:
+        patches = (struct patch *) &g_shellcore_patches_402;
+        num_patches = sizeof(g_shellcore_patches_402) / sizeof(struct patch);
+        break;
     case 0x4030000:
         patches = (struct patch *) &g_shellcore_patches_403;
         num_patches = sizeof(g_shellcore_patches_403) / sizeof(struct patch);
@@ -265,6 +293,8 @@ void apply_shellcore_patches()
         return;
     }
 
+    printf("[HEN] [SHELLCORE] selected %d patches for fw=0x%lx\n", num_patches, fw_ver);
+
     // Get shellcore proc
     printf("[HEN] [SHELLCORE] Finding shellcore\n");
     shellcore_proc = find_proc_by_name("SceShellCore");
@@ -272,17 +302,34 @@ void apply_shellcore_patches()
         printf("[HEN] [SHELLCORE] Failed to find shellcore\n");
         return;
     }
-    printf("[HEN] [SHELLCORE] shellcore proc = %p\n", shellcore_proc);
+    shellcore_pid = *(int *) ((char *) shellcore_proc + PROC_OFFSET_P_PID);
+    printf("[HEN] [SHELLCORE] shellcore proc = %p pid=%d vmspace=%p\n",
+           shellcore_proc,
+           shellcore_pid,
+           get_proc_vmmap(shellcore_proc));
 
     // Resolve shellcore base address
     shellcore_base_addr = shellcore_get_addr(shellcore_proc);
     printf("[HEN] [SHELLCORE] Found shellcore base = 0x%lx\n", shellcore_base_addr);
+    if (!shellcore_base_addr) {
+        printf("[HEN] [SHELLCORE] WARNING: shellcore base is zero, patch writes will likely fail\n");
+    }
 
     printf("[HEN] [SHELLCORE] Applying shellcore patches...\n");
+    patches_ok = 0;
+    patches_failed = 0;
     for (int i = 0; i < num_patches; i++) {
         cur_patch = &patches[i];
         printf("  offset=0x%lx, size=0x%x, data=%p\n", cur_patch->offset, cur_patch->size, &cur_patch->data);
 
-        proc_rw_mem(shellcore_proc, (shellcore_base_addr + cur_patch->offset), cur_patch->size, (void *) &cur_patch->data, NULL, 1);
+        int ret = proc_rw_mem(shellcore_proc, (shellcore_base_addr + cur_patch->offset), cur_patch->size, (void *) &cur_patch->data, NULL, 1);
+        if (ret == 0) {
+            patches_ok++;
+        } else {
+            patches_failed++;
+            printf("[HEN] [SHELLCORE] patch[%d] failed offset=0x%lx ret=0x%x\n", i, cur_patch->offset, ret);
+        }
     }
+
+    printf("[HEN] [SHELLCORE] patch summary ok=%d failed=%d\n", patches_ok, patches_failed);
 }
