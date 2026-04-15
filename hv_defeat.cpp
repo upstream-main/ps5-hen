@@ -514,7 +514,7 @@ int run_hv_defeat(void) {
     gpu_kernel_offsets go = {};
     go.proc_vmspace = KERNEL_OFFSET_PROC_P_VMSPACE;
     go.vmspace_vm_vmid = fw_off(ctx.fw, "VMSPACE_VM_VMID");
-    go.sizeof_gvmspace = 0x100;
+    go.sizeof_gvmspace = ctx.fw < 0x0200 ? 0xF8 : 0x100;
     go.gvmspace_page_dir_va = 0x38;
     go.gvmspace_size = 0x10;
     go.gvmspace_start_va = 0x08;

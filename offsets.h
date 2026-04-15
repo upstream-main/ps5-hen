@@ -56,7 +56,7 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0102_OFF_PML4PML4I",    0x4ADF29C},
     {"0102_OFF_PMAP_STORE",   0x4ADF2B8},
     {"0102_OFF_ALLPROC",      0x4411BF8},
-    {"0102_KERNEL_TEXT_SIZE",  0x0B40000},
+    {"0102_KERNEL_TEXT_SIZE",  0x0B30000},
     {"0102_BUS_DATA_DEVICES", 0x1D6D478},
     {"0102_HV_VCPU",            0x1398},
     {"0102_HV_VCPU_CPUID",      0x128},
@@ -64,10 +64,11 @@ static const std::unordered_map<std::string, uint64_t> fw_offsets = {
     {"0102_VMSPACE_VM_PMAP",     0x1D0},
     {"0102_PMAP_PM_PML4",        0x020},
     {"0102_PMAP_PM_CR3",         0x028},
-    {"0102_DATA_BASE_GVMSPACE",      0},  // TODO
+    {"0102_DATA_BASE_GVMSPACE",      0x06202E70},
     {"0102_KERNEL_OFF_CODE_CAVE",    0x0044000},
     {"0102_PPR_SYSENT",        0x1CAA7B0},
     {"0102_GADGET_JMP_PTR_RSI",  0x0042000},
+    {"0102_IOMMU_SOFTC", 0x41ED638 },
 
     // FW 1.05
     {"0105_KDATA_OFFSET",     0x1B40000},
